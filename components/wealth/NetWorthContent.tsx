@@ -1,0 +1,36 @@
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { SymbolView } from "expo-symbols";
+import { Text, useColorScheme, View } from "react-native";
+
+import { useSelectedCurrency } from "@/stores/settings";
+import { themeColors } from "@/utils/constants";
+import { formatMoney, WEALTH_TOTALS } from "@/utils/wealth";
+
+export function NetWorthContent() {
+  const scheme = useColorScheme();
+  const theme = themeColors(scheme);
+  const currency = useSelectedCurrency();
+  const netWorth = WEALTH_TOTALS.assets - WEALTH_TOTALS.liabilities;
+
+  return (
+    <View className="p-card">
+      <View className="mb-2.5 flex-row items-center gap-1.5">
+        <SymbolView
+          name="chart.line.uptrend.xyaxis"
+          size={13}
+          tintColor={theme.muted}
+          weight="semibold"
+          fallback={
+            <MaterialIcons name="trending-up" size={14} color={theme.muted} />
+          }
+        />
+        <Text className="text-xs font-semibold uppercase tracking-label text-muted dark:text-[#AEAEB2]">
+          My Net Worth
+        </Text>
+      </View>
+      <Text className="text-display font-bold tracking-display text-foreground tabular-nums dark:text-white">
+        {formatMoney(netWorth, currency.symbol)}
+      </Text>
+    </View>
+  );
+}
