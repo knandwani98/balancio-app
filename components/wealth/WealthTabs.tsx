@@ -27,8 +27,7 @@ export const ASSET_TABS: WealthTabItem[] = [
 
 export const LIABILITY_TABS: WealthTabItem[] = [
   { key: "credit-card", label: "Credit Card" },
-  { key: "bills", label: "Bills" },
-  { key: "recharge", label: "Recharge" },
+  { key: "bills&recharge", label: "Bills & Recharge" },
 ];
 
 const SPRING = {

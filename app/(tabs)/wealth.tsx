@@ -4,19 +4,16 @@ import {
   isLiquidGlassAvailable,
 } from "expo-glass-effect";
 import { styled } from "nativewind";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Platform, ScrollView, Text, useColorScheme, View } from "react-native";
-import Animated, {
-  FadeInLeft,
-  FadeInRight,
-  FadeOutLeft,
-  FadeOutRight,
-} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Screen } from "@/components/Screen";
+import { TabCard } from "@/components/TabCard";
+import { InvestmentTrackList } from "@/components/wealth/InvestmentTrackList";
 import { NetWorthContent } from "@/components/wealth/NetWorthContent";
 import { SectionHeading } from "@/components/wealth/SectionHeading";
+import { WealthTabPanel } from "@/components/wealth/WealthTabPanel";
 import {
   ASSET_TABS,
   LIABILITY_TABS,
@@ -96,7 +93,7 @@ export default function WealthScreen() {
           className="mt-6"
         />
 
-        <TabCard tintColor={theme.glassTint}>
+        <TabCard>
           <WealthTabs
             tabs={ASSET_TABS}
             activeTab={assetTab}
@@ -104,17 +101,19 @@ export default function WealthScreen() {
           />
         </TabCard>
 
-        <View className="mt-4 min-h-80 overflow-hidden rounded-card border border-card-border bg-card p-4 shadow-card elevation-sm dark:border-white/10 dark:bg-white/10">
-          <Animated.View
-            key={assetTab}
-            entering={(assetDirection >= 0 ? FadeInRight : FadeInLeft).duration(220)}
-            exiting={(assetDirection >= 0 ? FadeOutLeft : FadeOutRight).duration(160)}
-          >
+        <WealthTabPanel
+          tabKey={assetTab}
+          direction={assetDirection}
+          title={tabLabel(ASSET_TABS, assetTab)}
+        >
+          {assetTab === "investments" ? (
+            <InvestmentTrackList />
+          ) : (
             <Text className="text-sm text-muted dark:text-[#AEAEB2]">
-              {tabLabel(ASSET_TABS, assetTab)}
+              Coming soon
             </Text>
-          </Animated.View>
-        </View>
+          )}
+        </WealthTabPanel>
 
         <SectionHeading
           title="Liabilities"
@@ -125,7 +124,7 @@ export default function WealthScreen() {
           className="mt-6"
         />
 
-        <TabCard tintColor={theme.glassTint}>
+        <TabCard>
           <WealthTabs
             tabs={LIABILITY_TABS}
             activeTab={liabilityTab}
@@ -133,17 +132,16 @@ export default function WealthScreen() {
           />
         </TabCard>
 
-        <View className="mt-4 min-h-40 overflow-hidden rounded-card border border-card-border bg-card p-4 shadow-card elevation-sm dark:border-white/10 dark:bg-white/10">
-          <Animated.View
-            key={liabilityTab}
-            entering={(liabilityDirection >= 0 ? FadeInRight : FadeInLeft).duration(220)}
-            exiting={(liabilityDirection >= 0 ? FadeOutLeft : FadeOutRight).duration(160)}
-          >
-            <Text className="text-sm text-muted dark:text-[#AEAEB2]">
-              {tabLabel(LIABILITY_TABS, liabilityTab)}
-            </Text>
-          </Animated.View>
-        </View>
+        <WealthTabPanel
+          tabKey={liabilityTab}
+          direction={liabilityDirection}
+          title={tabLabel(LIABILITY_TABS, liabilityTab)}
+          className="min-h-40"
+        >
+          <Text className="text-sm text-muted dark:text-[#AEAEB2]">
+            Coming soon
+          </Text>
+        </WealthTabPanel>
       </ScrollView>
     </Screen>
   );
@@ -151,31 +149,4 @@ export default function WealthScreen() {
 
 function tabLabel(tabs: WealthTabItem[], key: WealthTab) {
   return tabs.find((tab) => tab.key === key)?.label ?? key;
-}
-
-function TabCard({
-  children,
-  tintColor,
-}: {
-  children: ReactNode;
-  tintColor: string;
-}) {
-  if (useGlass) {
-    return (
-      <StyledGlassView
-        className="mt-4 overflow-hidden rounded-card border border-card-border bg-card p-1 shadow-card elevation-sm dark:border-white/10 dark:bg-white/10"
-        glassEffectStyle="regular"
-        isInteractive
-        tintColor={tintColor}
-      >
-        {children}
-      </StyledGlassView>
-    );
-  }
-
-  return (
-    <View className="mt-4 overflow-hidden rounded-card border border-card-border bg-transparent p-1 shadow-card elevation-sm dark:border-white/10 dark:bg-white/10">
-      {children}
-    </View>
-  );
 }
