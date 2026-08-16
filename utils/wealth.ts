@@ -1,16 +1,11 @@
-export const WEALTH_TOTALS = {
-  assets: 312_450,
-  liabilities: 31_280,
-} as const;
-
 export type InvestmentAssetType = {
   key: string;
   label: string;
 };
 
 export const INVESTMENT_ASSET_TYPES: InvestmentAssetType[] = [
-  { key: "stocks", label: "Stocks" },
   { key: "mutual-funds", label: "Mutual Funds" },
+  { key: "stocks", label: "Stocks" },
   { key: "fixed-recurring-deposits", label: "Fixed & Recurring Deposits" },
   { key: "digital-assets", label: "Digital Assets" },
   { key: "gold", label: "Gold" },
@@ -27,4 +22,10 @@ export function formatMoney(amount: number, symbol: string) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+export function isPlanNameTracked(name: string, trackedNames: string[]) {
+  return trackedNames.some(
+    (tracked) => tracked.localeCompare(name, undefined, { sensitivity: "accent" }) === 0,
+  );
 }

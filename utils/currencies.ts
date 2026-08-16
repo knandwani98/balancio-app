@@ -21,6 +21,10 @@ export const CURRENCIES: Currency[] = [
 
 export const DEFAULT_CURRENCY_CODE = "USD";
 
+export function isSupportedCurrencyCode(code: string): boolean {
+  return CURRENCIES.some((currency) => currency.code === code);
+}
+
 export function formatCurrencyLabel(currency: Currency): string {
   return `${currency.symbol} ${currency.code}`;
 }

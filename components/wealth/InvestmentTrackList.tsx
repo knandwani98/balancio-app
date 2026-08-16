@@ -5,37 +5,33 @@ import {
   BottomSheetScrollView,
   type BottomSheetBackdropProps,
 } from "@gorhom/bottom-sheet";
-import { useCallback, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import {
+  ActivityIndicator,
   Pressable,
-  StyleSheet,
   Text,
   useColorScheme,
   View,
 } from "react-native";
 
-import { borderRadius } from "@/utils/constants";
+import { Hairline } from "@/components/Hairline";
+import type { InvestmentPlanSummary } from "@/lib/investmentPlans";
+import { sortPlansByValue } from "@/lib/investmentPlans";
+import { useSelectedCurrency } from "@/stores/settings";
+import { borderRadius, themeColors } from "@/utils/constants";
 import {
+  formatMoney,
   INVESTMENT_ASSET_PREVIEW_COUNT,
   INVESTMENT_ASSET_TYPES,
-  type InvestmentAssetType,
+  isPlanNameTracked,
+  type InvestmentAssetType
 } from "@/utils/wealth";
 
 const SHEET_RADIUS = Number.parseInt(borderRadius.card, 10);
 const TRACK_GREEN = "#0A7A4B";
 const TRACK_GREEN_DARK = "#34C759";
 
-function Hairline({ color }: { color: string }) {
-  return (
-    <View
-      style={{
-        height: StyleSheet.hairlineWidth,
-        backgroundColor: color,
-      }}
-    />
-  );
-}
-
+/** Starts tracking an untracked asset type. */
 function TrackButton({ onPress }: { onPress: () => void }) {
   const isDark = useColorScheme() === "dark";
   const tint = isDark ? TRACK_GREEN_DARK : TRACK_GREEN;
@@ -60,20 +56,19 @@ function TrackButton({ onPress }: { onPress: () => void }) {
   );
 }
 
+/** Sheet row: asset type + Track CTA for untracked types. */
 function AssetRow({
   item,
   showDivider,
-  dividerColor,
   onTrack,
 }: {
   item: InvestmentAssetType;
   showDivider: boolean;
-  dividerColor: string;
   onTrack: (item: InvestmentAssetType) => void;
 }) {
   return (
     <View>
-      {showDivider ? <Hairline color={dividerColor} /> : null}
+      {showDivider ? <Hairline /> : null}
       <View className="flex-row items-center justify-between py-3.5">
         <Text className="mr-3 flex-1 text-[17px] text-foreground dark:text-white">
           {item.label}
@@ -84,21 +79,90 @@ function AssetRow({
   );
 }
 
+/** List row: tracked plan with holdings count and current value. */
+function PlanRow({
+  plan,
+  showDivider,
+  symbol,
+}: {
+  plan: InvestmentPlanSummary;
+  showDivider: boolean;
+  symbol: string;
+}) {
+  return (
+    <View>
+      {showDivider ? <Hairline /> : null}
+      <View className="flex-row items-center justify-between py-3.5">
+        <View className="mr-3 min-w-0 flex-1">
+          <View className="flex-row items-center gap-2">
+            <Text
+              className="text-[17px] text-foreground dark:text-white"
+              numberOfLines={1}
+            >
+              {plan.name}
+            </Text>
+            {plan.holding_count > 0 && <Text className="text-sm font-semibold bg-foreground text-white rounded-full px-2 py-1">
+              {plan.holding_count}
+            </Text>}
+          </View>
+        </View>
+        <Text className="text-[17px] font-semibold tabular-nums text-foreground dark:text-white">
+          {formatMoney(plan.current_value, symbol)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 type InvestmentTrackListProps = {
+  plans?: InvestmentPlanSummary[];
+  loading?: boolean;
   onTrack?: (item: InvestmentAssetType) => void;
 };
 
-export function InvestmentTrackList({ onTrack }: InvestmentTrackListProps) {
+export function InvestmentTrackList({
+  plans = [],
+  loading = false,
+  onTrack,
+}: InvestmentTrackListProps) {
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
+  const theme = themeColors(scheme);
+  const currency = useSelectedCurrency();
   const sheetRef = useRef<BottomSheetModal>(null);
-  const dividerColor = isDark ? "rgba(255,255,255,0.12)" : "rgba(60,60,67,0.18)";
 
-  const previewItems = INVESTMENT_ASSET_TYPES.slice(
-    0,
-    INVESTMENT_ASSET_PREVIEW_COUNT,
+  const sortedPlans = useMemo(() => sortPlansByValue(plans), [plans]);
+  const trackedNames = useMemo(() => plans.map((plan) => plan.name), [plans]);
+  // Asset types that do not yet have a matching plan.
+  const untrackedItems = useMemo(
+    () =>
+      INVESTMENT_ASSET_TYPES.filter(
+        (item) => !isPlanNameTracked(item.label, trackedNames),
+      ),
+    [trackedNames],
   );
-  const moreItems = INVESTMENT_ASSET_TYPES.slice(INVESTMENT_ASSET_PREVIEW_COUNT);
+  const planByAssetKey = useMemo(() => {
+    const map = new Map<string, InvestmentPlanSummary>();
+    for (const item of INVESTMENT_ASSET_TYPES) {
+      const plan = plans.find((candidate) =>
+        isPlanNameTracked(item.label, [candidate.name]),
+      );
+      if (plan) map.set(item.key, plan);
+    }
+    return map;
+  }, [plans]);
+
+  const previewPlans = sortedPlans.slice(0, INVESTMENT_ASSET_PREVIEW_COUNT);
+  // Pad the preview to INVESTMENT_ASSET_PREVIEW_COUNT with untracked types.
+  const previewAssets = untrackedItems.slice(
+    0,
+    Math.max(0, INVESTMENT_ASSET_PREVIEW_COUNT - previewPlans.length),
+  );
+  const remainingUntracked = untrackedItems.slice(previewAssets.length);
+  // Empty state lists every type; otherwise only types not already in the preview.
+  const sheetItems = INVESTMENT_ASSET_TYPES;
+  const moreLabel = "View All";
+  const showMore = remainingUntracked.length > 0;
 
   const handleTrack = useCallback(
     (item: InvestmentAssetType) => {
@@ -119,43 +183,64 @@ export function InvestmentTrackList({ onTrack }: InvestmentTrackListProps) {
     [],
   );
 
+  if (loading) {
+    return (
+      <View className="items-center justify-center py-8">
+        <ActivityIndicator size="small" color={theme.muted} />
+      </View>
+    );
+  }
+
   return (
     <>
       <View>
-        {previewItems.map((item, index) => (
+        {/* Always show PREVIEW_COUNT rows: plans first, then untracked types. */}
+        {previewPlans.map((plan, index) => (
+          <PlanRow
+            key={plan.id}
+            plan={plan}
+            showDivider={index > 0}
+            symbol={currency.symbol}
+          />
+        ))}
+        {previewAssets.map((item, index) => (
           <AssetRow
             key={item.key}
             item={item}
-            showDivider={index > 0}
-            dividerColor={dividerColor}
+            showDivider={previewPlans.length + index > 0}
             onTrack={handleTrack}
           />
         ))}
 
-        {moreItems.length > 0 ? (
+        {showMore ? (
           <>
-            <Hairline color={dividerColor} />
+            {previewPlans.length + previewAssets.length > 0 ? <Hairline /> : null}
             <Pressable
               onPress={() => sheetRef.current?.present()}
               accessibilityRole="button"
-              accessibilityLabel="View more asset types"
+              accessibilityLabel={moreLabel}
               className="flex-row items-center justify-center gap-1 pt-8 pb-3.5"
             >
               <Text
                 className="text-[15px] font-semibold"
                 style={{ color: isDark ? TRACK_GREEN_DARK : TRACK_GREEN }}
               >
-                View All
+                {moreLabel}
               </Text>
-              <MaterialIcons name="arrow-forward" size={16} color={isDark ? TRACK_GREEN_DARK : TRACK_GREEN} />
+              <MaterialIcons
+                name="arrow-forward"
+                size={16}
+                color={isDark ? TRACK_GREEN_DARK : TRACK_GREEN}
+              />
             </Pressable>
           </>
         ) : null}
       </View>
 
+      {/* Full catalog of types the user can still start tracking. */}
       <BottomSheetModal
         ref={sheetRef}
-        snapPoints={["55%"]}
+        snapPoints={["75%"]}
         enableDynamicSizing={false}
         enablePanDownToClose
         enableHandlePanningGesture={false}
@@ -169,22 +254,35 @@ export function InvestmentTrackList({ onTrack }: InvestmentTrackListProps) {
         }}
       >
         <Text className="px-4 pb-2 text-[13px] font-semibold uppercase tracking-label text-muted dark:text-[#AEAEB2]">
-          More assets
+          All assets
         </Text>
         <BottomSheetScrollView
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}
           bounces={false}
           showsVerticalScrollIndicator={false}
         >
-          {moreItems.map((item, index) => (
-            <AssetRow
-              key={item.key}
-              item={item}
-              showDivider={index > 0}
-              dividerColor={dividerColor}
-              onTrack={handleTrack}
-            />
-          ))}
+          {sheetItems.map((item, index) => {
+            const plan = planByAssetKey.get(item.key);
+            if (plan) {
+              return (
+                <PlanRow
+                  key={item.key}
+                  plan={plan}
+                  showDivider={index > 0}
+                  symbol={currency.symbol}
+                />
+              );
+            }
+
+            return (
+              <AssetRow
+                key={item.key}
+                item={item}
+                showDivider={index > 0}
+                onTrack={handleTrack}
+              />
+            );
+          })}
         </BottomSheetScrollView>
       </BottomSheetModal>
     </>

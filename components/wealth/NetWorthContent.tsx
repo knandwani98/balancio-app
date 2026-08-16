@@ -1,16 +1,23 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { SymbolView } from "expo-symbols";
-import { Text, useColorScheme, View } from "react-native";
+import { ActivityIndicator, Text, useColorScheme, View } from "react-native";
 
 import { useSelectedCurrency } from "@/stores/settings";
 import { themeColors } from "@/utils/constants";
-import { formatMoney, WEALTH_TOTALS } from "@/utils/wealth";
+import { formatMoney } from "@/utils/wealth";
 
-export function NetWorthContent() {
+type NetWorthContentProps = {
+  amount: number;
+  initialLoading?: boolean;
+};
+
+export function NetWorthContent({
+  amount,
+  initialLoading = false,
+}: NetWorthContentProps) {
   const scheme = useColorScheme();
   const theme = themeColors(scheme);
   const currency = useSelectedCurrency();
-  const netWorth = WEALTH_TOTALS.assets - WEALTH_TOTALS.liabilities;
 
   return (
     <View className="p-card">
@@ -28,9 +35,15 @@ export function NetWorthContent() {
           My Net Worth
         </Text>
       </View>
-      <Text className="text-display font-bold tracking-display text-foreground tabular-nums dark:text-white">
-        {formatMoney(netWorth, currency.symbol)}
-      </Text>
+      {initialLoading ? (
+        <View className="min-h-[41px] justify-center">
+          <ActivityIndicator size="small" color={theme.muted} />
+        </View>
+      ) : (
+        <Text className="text-display font-bold tracking-display text-foreground tabular-nums dark:text-white">
+          {formatMoney(amount, currency.symbol)}
+        </Text>
+      )}
     </View>
   );
 }

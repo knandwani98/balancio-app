@@ -1,13 +1,8 @@
-import {
-  GlassView,
-  isGlassEffectAPIAvailable,
-  isLiquidGlassAvailable,
-} from "expo-glass-effect";
-import { styled } from "nativewind";
 import { useState } from "react";
-import { Platform, ScrollView, Text, useColorScheme, View } from "react-native";
+import { RefreshControl, ScrollView, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { GlassCard } from "@/components/GlassCard";
 import { Screen } from "@/components/Screen";
 import { TabCard } from "@/components/TabCard";
 import { InvestmentTrackList } from "@/components/wealth/InvestmentTrackList";
@@ -21,25 +16,27 @@ import {
   type WealthTab,
   type WealthTabItem,
 } from "@/components/wealth/WealthTabs";
-import { themeColors } from "@/utils/constants";
-import { WEALTH_TOTALS } from "@/utils/wealth";
+import { useInvestmentPlans } from "@/hooks/useInvestmentPlans";
+import { useNetworth } from "@/hooks/useNetworth";
+import type { WealthTotals } from "@/lib/networth";
 
-const StyledGlassView = styled(GlassView);
-
-const useGlass =
-  Platform.OS === "ios" && isLiquidGlassAvailable() && isGlassEffectAPIAvailable();
-
-const ASSET_TAB_ORDER = ASSET_TABS.filter((tab) => !tab.disabled).map((tab) => tab.key);
+const ASSET_TAB_ORDER = ASSET_TABS.map((tab) => tab.key);
 const LIABILITY_TAB_ORDER = LIABILITY_TABS.map((tab) => tab.key);
 
 export default function WealthScreen() {
-  const scheme = useColorScheme();
-  const theme = themeColors(scheme);
   const insets = useSafeAreaInsets();
+  const { totals, initialLoading, error, reload } = useNetworth();
+  const {
+    plans,
+    initialLoading: plansLoading,
+    error: plansError,
+    reload: reloadPlans,
+  } = useInvestmentPlans();
   const [assetTab, setAssetTab] = useState<WealthTab>("investments");
   const [liabilityTab, setLiabilityTab] = useState<WealthTab>("credit-card");
   const [assetDirection, setAssetDirection] = useState(1);
   const [liabilityDirection, setLiabilityDirection] = useState(1);
+  const [refreshing, setRefreshing] = useState(false);
 
   const handleAssetTabChange = (tab: WealthTab) => {
     setAssetDirection(
@@ -57,6 +54,16 @@ export default function WealthScreen() {
     setLiabilityTab(tab);
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([reload(), reloadPlans()]);
+    setRefreshing(false);
+  };
+
+  const netWorthCard = (
+    <NetWorthContent amount={totals.networth} initialLoading={initialLoading} />
+  );
+
   return (
     <Screen title="Wealth">
       <ScrollView
@@ -68,28 +75,35 @@ export default function WealthScreen() {
         }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />
+        }
       >
-        {useGlass ? (
-          <StyledGlassView
-            className="overflow-hidden rounded-card"
-            glassEffectStyle="regular"
-            isInteractive
-            tintColor={theme.glassTint}
-          >
-            <NetWorthContent />
-          </StyledGlassView>
-        ) : (
-          <View className="overflow-hidden rounded-card border border-card-border bg-card shadow-card elevation-sm dark:border-white/10 dark:bg-white/10">
-            <NetWorthContent />
-          </View>
-        )}
+        <GlassCard>{netWorthCard}</GlassCard>
+
+        {error ? (
+          <Text className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">
+            {error}
+          </Text>
+        ) : null}
+
+        {plansError ? (
+          <Text className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">
+            {plansError}
+          </Text>
+        ) : null}
+
+
+
+        {/* Assets */}
 
         <SectionHeading
           title="Assets"
-          amount={WEALTH_TOTALS.assets}
+          amount={totals.assets}
           symbol="chart.pie.fill"
           icon="pie-chart"
           tone="assets"
+          initialLoading={initialLoading}
           className="mt-6"
         />
 
@@ -105,9 +119,11 @@ export default function WealthScreen() {
           tabKey={assetTab}
           direction={assetDirection}
           title={tabLabel(ASSET_TABS, assetTab)}
+          amount={assetTabAmount(assetTab, totals, plans)}
+          initialLoading={initialLoading}
         >
           {assetTab === "investments" ? (
-            <InvestmentTrackList />
+            <InvestmentTrackList plans={plans} loading={plansLoading} />
           ) : (
             <Text className="text-sm text-muted dark:text-[#AEAEB2]">
               Coming soon
@@ -115,12 +131,16 @@ export default function WealthScreen() {
           )}
         </WealthTabPanel>
 
+
+        {/* Liabilities */}
+
         <SectionHeading
           title="Liabilities"
-          amount={WEALTH_TOTALS.liabilities}
+          amount={totals.liabilities}
           symbol="creditcard.fill"
           icon="credit-card"
           tone="liabilities"
+          initialLoading={initialLoading}
           className="mt-6"
         />
 
@@ -136,6 +156,8 @@ export default function WealthScreen() {
           tabKey={liabilityTab}
           direction={liabilityDirection}
           title={tabLabel(LIABILITY_TABS, liabilityTab)}
+          amount={liabilityTabAmount(liabilityTab, totals)}
+          initialLoading={initialLoading}
           className="min-h-40"
         >
           <Text className="text-sm text-muted dark:text-[#AEAEB2]">
@@ -149,4 +171,29 @@ export default function WealthScreen() {
 
 function tabLabel(tabs: WealthTabItem[], key: WealthTab) {
   return tabs.find((tab) => tab.key === key)?.label ?? key;
+}
+
+function assetTabAmount(
+  tab: WealthTab,
+  totals: WealthTotals,
+  plans: { current_value: number }[],
+) {
+  switch (tab) {
+    case "investments":
+      return plans.reduce((sum, plan) => sum + plan.current_value, 0);
+    case "banks":
+      return Math.max(0, totals.assets - plans.reduce((sum, plan) => sum + plan.current_value, 0));
+    default:
+      return 0;
+  }
+}
+
+function liabilityTabAmount(tab: WealthTab, totals: WealthTotals) {
+  switch (tab) {
+    case "credit-card":
+    case "bills":
+      return totals.liabilities;
+    default:
+      return 0;
+  }
 }

@@ -1,18 +1,8 @@
-import {
-  GlassView,
-  isGlassEffectAPIAvailable,
-  isLiquidGlassAvailable,
-} from "expo-glass-effect";
-import { styled } from "nativewind";
 import type { ReactNode } from "react";
-import { Platform, useColorScheme, View } from "react-native";
+import { View } from "react-native";
 
-import { themeColors } from "@/utils/constants";
-
-const StyledGlassView = styled(GlassView);
-
-const useGlass =
-  Platform.OS === "ios" && isLiquidGlassAvailable() && isGlassEffectAPIAvailable();
+import { GlassCard } from "@/components/GlassCard";
+import { cn } from "@/utils/cn";
 
 type TabCardProps = {
   children: ReactNode;
@@ -20,24 +10,9 @@ type TabCardProps = {
 };
 
 export function TabCard({ children, className }: TabCardProps) {
-  const scheme = useColorScheme();
-  const theme = themeColors(scheme);
-  const baseClassName = `mt-4 overflow-hidden rounded-card border border-card-border p-1 shadow-card elevation-sm dark:border-white/10 dark:bg-white/10 ${className ?? ""}`;
-
-  if (useGlass) {
-    return (
-      <StyledGlassView
-        className={`${baseClassName} bg-card`}
-        glassEffectStyle="regular"
-        isInteractive
-        tintColor={theme.glassTint}
-      >
-        {children}
-      </StyledGlassView>
-    );
-  }
-
   return (
-    <View className={`${baseClassName} bg-transparent`}>{children}</View>
+    <GlassCard className={cn("mt-4", className)}>
+      <View className="p-1">{children}</View>
+    </GlassCard>
   );
 }

@@ -1,6 +1,6 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { SymbolView, type SFSymbol } from "expo-symbols";
-import { Text, useColorScheme, View } from "react-native";
+import { ActivityIndicator, Text, useColorScheme, View } from "react-native";
 
 import { useSelectedCurrency } from "@/stores/settings";
 import { formatMoney } from "@/utils/wealth";
@@ -26,6 +26,7 @@ type SectionHeadingProps = {
   symbol: SFSymbol;
   icon: keyof typeof MaterialIcons.glyphMap;
   tone: keyof typeof SECTION_TONES;
+  initialLoading?: boolean;
   className?: string;
 };
 
@@ -35,6 +36,7 @@ export function SectionHeading({
   symbol,
   icon,
   tone,
+  initialLoading = false,
   className,
 }: SectionHeadingProps) {
   const isDark = useColorScheme() === "dark";
@@ -71,9 +73,15 @@ export function SectionHeading({
           >
             {title}
           </Text>
-          <Text className="mt-1 text-[22px] font-bold tabular-nums tracking-display text-foreground dark:text-white">
-            {formatMoney(amount, currency.symbol)}
-          </Text>
+          {initialLoading ? (
+            <View className="mt-1 min-h-[30px] justify-center">
+              <ActivityIndicator size="small" color={tint} />
+            </View>
+          ) : (
+            <Text className="mt-1 text-[22px] font-bold tabular-nums tracking-display text-foreground dark:text-white">
+              {formatMoney(amount, currency.symbol)}
+            </Text>
+          )}
         </View>
       </View>
     </View>

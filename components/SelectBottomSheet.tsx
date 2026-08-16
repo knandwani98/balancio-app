@@ -10,15 +10,17 @@ import {
   useCallback,
   useImperativeHandle,
   useRef,
+  useState,
 } from "react";
 import {
+  ActivityIndicator,
   Pressable,
-  StyleSheet,
   Text,
   useColorScheme,
   View,
 } from "react-native";
 
+import { Hairline } from "@/components/Hairline";
 import { borderRadius } from "@/utils/constants";
 
 const SHEET_RADIUS = Number.parseInt(borderRadius.card, 10);
@@ -37,21 +39,9 @@ type SelectBottomSheetProps = {
   title: string;
   options: SelectBottomSheetOption[];
   selectedValue: string;
-  onSelect: (value: string) => void;
+  onSelect: (value: string) => void | Promise<void>;
   snapPoints?: (string | number)[];
 };
-
-function Hairline({ color }: { color: string }) {
-  return (
-    <View
-      style={{
-        height: StyleSheet.hairlineWidth,
-        backgroundColor: color,
-        marginLeft: 16,
-      }}
-    />
-  );
-}
 
 export const SelectBottomSheet = forwardRef<
   SelectBottomSheetRef,
@@ -63,7 +53,9 @@ export const SelectBottomSheet = forwardRef<
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
   const sheetRef = useRef<BottomSheetModal>(null);
+  const [pendingValue, setPendingValue] = useState<string | null>(null);
   const dividerColor = isDark ? "rgba(255,255,255,0.12)" : "rgba(60,60,67,0.18)";
+  const isBusy = pendingValue !== null;
 
   useImperativeHandle(ref, () => ({
     present: () => sheetRef.current?.present(),
@@ -76,10 +68,10 @@ export const SelectBottomSheet = forwardRef<
         {...props}
         appearsOnIndex={0}
         disappearsOnIndex={-1}
-        pressBehavior="close"
+        pressBehavior={isBusy ? "none" : "close"}
       />
     ),
-    [],
+    [isBusy],
   );
 
   return (
@@ -87,7 +79,7 @@ export const SelectBottomSheet = forwardRef<
       ref={sheetRef}
       snapPoints={snapPoints}
       enableDynamicSizing={false}
-      enablePanDownToClose
+      enablePanDownToClose={!isBusy}
       enableHandlePanningGesture={false}
       backdropComponent={renderBackdrop}
       backgroundStyle={{
@@ -110,23 +102,43 @@ export const SelectBottomSheet = forwardRef<
       >
         {options.map((option, index) => {
           const selected = option.value === selectedValue;
+          const pending = option.value === pendingValue;
 
           return (
             <View key={option.value}>
-              {index > 0 ? <Hairline color={dividerColor} /> : null}
+              {index > 0 ? <Hairline color={dividerColor} inset={16} /> : null}
               <Pressable
+                disabled={isBusy}
                 onPress={() => {
-                  onSelect(option.value);
-                  sheetRef.current?.dismiss();
+                  if (option.value === selectedValue) {
+                    sheetRef.current?.dismiss();
+                    return;
+                  }
+
+                  setPendingValue(option.value);
+
+                  void Promise.resolve(onSelect(option.value))
+                    .then(() => {
+                      sheetRef.current?.dismiss();
+                    })
+                    .catch(() => {
+                      // Keep the sheet open so the user can retry.
+                    })
+                    .finally(() => {
+                      setPendingValue(null);
+                    });
                 }}
                 className="flex-row items-center justify-between px-4 py-3.5"
+                style={isBusy && !pending ? { opacity: 0.45 } : undefined}
                 accessibilityRole="button"
-                accessibilityState={{ selected }}
+                accessibilityState={{ selected, busy: pending, disabled: isBusy }}
               >
                 <Text className="text-[17px] text-foreground dark:text-white">
                   {option.label}
                 </Text>
-                {selected ? (
+                {pending ? (
+                  <ActivityIndicator size="small" color="#007AFF" />
+                ) : selected ? (
                   <MaterialIcons name="check" size={22} color="#007AFF" />
                 ) : null}
               </Pressable>

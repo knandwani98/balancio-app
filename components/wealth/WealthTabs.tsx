@@ -16,18 +16,16 @@ export type WealthTab = string;
 export type WealthTabItem = {
   key: WealthTab;
   label: string;
-  disabled?: boolean;
 };
 
 export const ASSET_TABS: WealthTabItem[] = [
   { key: "investments", label: "Investments" },
   { key: "banks", label: "Banks" },
-  { key: "insurance", label: "Insurance", disabled: true },
 ];
 
 export const LIABILITY_TABS: WealthTabItem[] = [
   { key: "credit-card", label: "Credit Card" },
-  { key: "bills&recharge", label: "Bills & Recharge" },
+  { key: "bills", label: "Bills" },
 ];
 
 const SPRING = {
@@ -109,37 +107,33 @@ export function WealthTabs({ tabs, activeTab, onChange }: WealthTabsProps) {
     <View className="relative flex-row">
       <Animated.View
         pointerEvents="none"
-        className="absolute bottom-0 top-0 rounded-card shadow-card"
-        style={indicatorStyle}
+        className="absolute bottom-0 top-0"
+        style={[
+          indicatorStyle,
+          { borderCurve: "continuous", borderRadius: 999 },
+        ]}
       />
 
-      {tabs.map((tab, index) => {
-        const isDisabled = Boolean(tab.disabled);
-
-        return (
-          <Pressable
-            key={tab.key}
-            disabled={isDisabled}
-            onLayout={(event) => onTabLayout(index, event)}
-            onPress={() => {
-              if (isDisabled || tab.key === activeTab) return;
-              void Haptics.selectionAsync();
-              onChange(tab.key);
-            }}
-            className="flex-1 items-center justify-center rounded-xl px-2 py-2.5"
-            style={isDisabled ? { opacity: 0.45 } : undefined}
-          >
-            <TabLabel
-              label={tab.label}
-              index={index}
-              progress={progress}
-              disabled={isDisabled}
-              activeColor={theme.tabActive}
-              inactiveColor={theme.tabInactive}
-            />
-          </Pressable>
-        );
-      })}
+      {tabs.map((tab, index) => (
+        <Pressable
+          key={tab.key}
+          onLayout={(event) => onTabLayout(index, event)}
+          onPress={() => {
+            if (tab.key === activeTab) return;
+            void Haptics.selectionAsync();
+            onChange(tab.key);
+          }}
+          className="flex-1 items-center justify-center rounded-xl px-2 py-2.5"
+        >
+          <TabLabel
+            label={tab.label}
+            index={index}
+            progress={progress}
+            activeColor={theme.tabActive}
+            inactiveColor={theme.tabInactive}
+          />
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -148,22 +142,16 @@ function TabLabel({
   label,
   index,
   progress,
-  disabled,
   activeColor,
   inactiveColor,
 }: {
   label: string;
   index: number;
   progress: SharedValue<number>;
-  disabled?: boolean;
   activeColor: string;
   inactiveColor: string;
 }) {
   const style = useAnimatedStyle(() => {
-    if (disabled) {
-      return { color: inactiveColor };
-    }
-
     const distance = Math.abs(progress.value - index);
     const t = Math.max(0, 1 - distance);
 
